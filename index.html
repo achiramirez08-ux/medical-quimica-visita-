@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kit de Visita · Medical Química SA</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #0B0F1A; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+  .logo { font-size: 11px; letter-spacing: 4px; text-transform: uppercase; color: #4ECDC4; margin-bottom: 16px; text-align: center; }
+  h1 { font-size: clamp(24px, 5vw, 36px); font-weight: 900; color: #fff; text-align: center; line-height: 1.2; margin-bottom: 8px; }
+  .sub { font-size: 14px; color: #4A5A7A; text-align: center; margin-bottom: 48px; }
+  .cards { display: flex; flex-direction: column; gap: 16px; width: 100%; max-width: 480px; }
+  .card { background: #111827; border-radius: 18px; padding: 28px 24px; border: 1px solid #1E2A3E; text-decoration: none; display: block; transition: all 0.25s; position: relative; overflow: hidden; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .card.azul::before { background: linear-gradient(90deg, #1B4FBB, #4ECDC4); }
+  .card.oscuro::before { background: linear-gradient(90deg, #E74C3C, #F39C12); }
+  .card:hover { transform: translateY(-2px); border-color: #2E3A5A; }
+  .card-emoji { font-size: 36px; margin-bottom: 12px; display: block; }
+  .card-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .card-desc { font-size: 13px; color: #4A5A7A; line-height: 1.5; margin-bottom: 14px; }
+  .card-btn { display: inline-block; font-size: 13px; font-weight: 700; padding: 8px 20px; border-radius: 20px; }
+  .card.azul .card-btn { background: #1B4FBB; color: #fff; }
+  .card.oscuro .card-btn { background: #E74C3C; color: #fff; }
+  .footer { margin-top: 40px; font-size: 11px; color: #2A3A5A; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="logo">Kit de Visita Consultora</div>
+  <h1>Medical Química SA</h1>
+  <p class="sub">Adriana Ramírez · Consultora en Procesos e IA</p>
+
+  <div class="cards">
+    <a href="Relevamiento_MedicalQuimica.html" class="card azul">
+      <span class="card-emoji">📋</span>
+      <div class="card-title">Formulario de Relevamiento</div>
+      <div class="card-desc">Completar durante la visita. Guarda automáticamente. 7 secciones con preguntas estratégicas.</div>
+      <span class="card-btn">Abrir formulario →</span>
+    </a>
+
+    <a href="Analisis_Licitaciones_MedicalQuimica.html" class="card oscuro">
+      <span class="card-emoji">📊</span>
+      <div class="card-title">Análisis de Licitaciones DNCP</div>
+      <div class="card-desc">Mostrar en reunión como demo. 192 participaciones · 150 ganadas · 42 oportunidades de mejora.</div>
+      <span class="card-btn">Ver análisis →</span>
+    </a>
+  </div>
+
+  <div class="footer">
+    Datos fuente: Portal DNCP Paraguay · contrataciones.gov.py · Información pública<br>
+    Uso interno · Preparación de visita
+  </div>
+</body>
+</html>

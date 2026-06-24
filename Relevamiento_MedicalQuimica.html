@@ -88,6 +88,11 @@
   .pe-por-que { font-size: 12px; color: #888; margin-top: 8px; line-height: 1.5; border-top: 1px solid #2A2A3E; padding-top: 8px; }
   .preguntas-bloque { margin-bottom: 8px; }
   .preguntas-titulo { font-size: 12px; font-weight: 700; color: #1B4FBB; margin-bottom: 10px; margin-top: 16px; letter-spacing: 1px; text-transform: uppercase; }
+  .autosave-banner { position: fixed; bottom: 0; left: 0; right: 0; background: #1A7A4A; color: #fff; font-size: 12px; font-weight: 600; text-align: center; padding: 8px; z-index: 200; opacity: 0; transition: opacity 0.4s; pointer-events: none; }
+  .autosave-banner.visible { opacity: 1; }
+  .autosave-status { display: flex; align-items: center; justify-content: space-between; background: #E6F4ED; border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: #1A7A4A; }
+  .autosave-status span { font-weight: 600; }
+  .btn-limpiar { background: none; border: 1px solid #E74C3C; color: #E74C3C; border-radius: 8px; padding: 4px 12px; font-size: 11px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -109,8 +114,59 @@
 <div class="contenido" id="contenido"></div>
 
 <script>
+const STORAGE_KEY = 'relevamiento_medical_quimica_v1';
+
+function cargarDatos() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      Object.assign(DATOS, parsed.datos || {});
+      Object.assign(MULTI, parsed.multi || {});
+    }
+  } catch(e) { console.log('Sin datos guardados'); }
+}
+
+function guardarDatos() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ datos: DATOS, multi: MULTI, timestamp: new Date().toISOString() }));
+    mostrarAutosave();
+  } catch(e) {}
+}
+
+function mostrarAutosave() {
+  const banner = document.getElementById('autosave-banner');
+  if (!banner) return;
+  banner.classList.add('visible');
+  setTimeout(() => banner.classList.remove('visible'), 2000);
+}
+
+function limpiarDatos() {
+  if (confirm('¿Borrar todos los datos guardados?')) {
+    localStorage.removeItem(STORAGE_KEY);
+    Object.keys(DATOS).forEach(k => delete DATOS[k]);
+    Object.keys(MULTI).forEach(k => delete MULTI[k]);
+    render();
+  }
+}
+
+function ultimoGuardado() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.timestamp) {
+        const d = new Date(parsed.timestamp);
+        return d.toLocaleTimeString('es-PY', {hour:'2-digit', minute:'2-digit'});
+      }
+    }
+  } catch(e) {}
+  return null;
+}
+
 const DATOS = {};
 const MULTI = {};
+cargarDatos();
 
 const SECCIONES = [
   {
@@ -264,19 +320,19 @@ function crearCampo(campo) {
     const inp = document.createElement("input");
     inp.type = "text"; inp.placeholder = campo.placeholder || ""; inp.value = DATOS[campo.id] || "";
     if (inp.value) inp.classList.add("filled");
-    inp.oninput = () => { DATOS[campo.id] = inp.value; inp.classList.toggle("filled", !!inp.value); actualizarProgreso(); renderNav(); };
+    inp.oninput = () => { DATOS[campo.id] = inp.value; inp.classList.toggle("filled", !!inp.value); actualizarProgreso(); renderNav(); guardarDatos(); };
     div.appendChild(inp);
   } else if (campo.tipo === "fecha") {
     const inp = document.createElement("input");
     inp.type = "date"; inp.value = DATOS[campo.id] || "";
     if (inp.value) inp.classList.add("filled");
-    inp.onchange = () => { DATOS[campo.id] = inp.value; inp.classList.toggle("filled", !!inp.value); actualizarProgreso(); renderNav(); };
+    inp.onchange = () => { DATOS[campo.id] = inp.value; inp.classList.toggle("filled", !!inp.value); actualizarProgreso(); renderNav(); guardarDatos(); };
     div.appendChild(inp);
   } else if (campo.tipo === "nota") {
     const ta = document.createElement("textarea");
     ta.placeholder = campo.placeholder || "Escribí acá..."; ta.value = DATOS[campo.id] || "";
     if (ta.value) ta.classList.add("filled");
-    ta.oninput = () => { DATOS[campo.id] = ta.value; ta.classList.toggle("filled", !!ta.value); actualizarProgreso(); renderNav(); };
+    ta.oninput = () => { DATOS[campo.id] = ta.value; ta.classList.toggle("filled", !!ta.value); actualizarProgreso(); renderNav(); guardarDatos(); };
     div.appendChild(ta);
   } else if (campo.tipo === "sino") {
     const grp = document.createElement("div"); grp.className = "sino-group";
@@ -284,7 +340,7 @@ function crearCampo(campo) {
       const btn = document.createElement("button");
       btn.className = "sino-btn" + (DATOS[campo.id] === op ? " sel-"+op : "");
       btn.textContent = op === "si" ? "✓ Sí" : "✗ No";
-      btn.onclick = () => { DATOS[campo.id] = op; actualizarProgreso(); renderNav(); renderContenido(); };
+      btn.onclick = () => { DATOS[campo.id] = op; actualizarProgreso(); renderNav(); renderContenido(); guardarDatos(); };
       grp.appendChild(btn);
     });
     div.appendChild(grp);
@@ -315,7 +371,7 @@ function crearCampo(campo) {
       const btn = document.createElement("button");
       btn.className = "opcion-btn" + (DATOS[campo.id] === op ? " sel" : "");
       btn.textContent = (DATOS[campo.id] === op ? "◉ " : "○ ") + op;
-      btn.onclick = () => { DATOS[campo.id] = op; actualizarProgreso(); renderNav(); renderContenido(); };
+      btn.onclick = () => { DATOS[campo.id] = op; actualizarProgreso(); renderNav(); renderContenido(); guardarDatos(); };
       grp.appendChild(btn);
     });
     div.appendChild(grp);
@@ -330,7 +386,7 @@ function crearCampo(campo) {
       btn.onclick = () => {
         if (MULTI[campo.id].includes(op)) MULTI[campo.id] = MULTI[campo.id].filter(x => x !== op);
         else MULTI[campo.id].push(op);
-        actualizarProgreso(); renderNav(); renderContenido();
+        actualizarProgreso(); renderNav(); renderContenido(); guardarDatos();
       };
       grp.appendChild(btn);
     });
@@ -347,6 +403,12 @@ function renderContenido() {
   const hdr = document.createElement("div"); hdr.className = "sec-header";
   hdr.innerHTML = `<span class="sec-emoji">${sec.emoji}</span><div><div class="sec-title">${sec.titulo}</div><div class="sec-sub">${completadosSec(sec)}/${sec.campos.length} completados</div></div>`;
   cont.appendChild(hdr);
+
+  // Autosave status bar
+  const statusBar = document.createElement("div"); statusBar.className = "autosave-status";
+  const t = ultimoGuardado();
+  statusBar.innerHTML = `<span id="autosave-time">${t ? 'Último guardado: ' + t : '⚡ Se guarda automáticamente mientras completás'}</span><button class="btn-limpiar" onclick="limpiarDatos()">🗑 Borrar todo</button>`;
+  cont.appendChild(statusBar);
 
   if (sec.nota) {
     const tip = document.createElement("div"); tip.className = "nota-tip";
@@ -414,8 +476,19 @@ function renderContenido() {
   cont.appendChild(actions);
 }
 
-function render() { renderNav(); renderContenido(); actualizarProgreso(); }
+function render() {
+  renderNav();
+  renderContenido();
+  actualizarProgreso();
+  // Update autosave status
+  const statusEl = document.getElementById('autosave-time');
+  if (statusEl) {
+    const t = ultimoGuardado();
+    statusEl.textContent = t ? 'Último guardado: ' + t : 'Sin guardar aún';
+  }
+}
 render();
 </script>
+<div class="autosave-banner" id="autosave-banner">✓ Datos guardados automáticamente</div>
 </body>
 </html>

@@ -1,0 +1,488 @@
+import { useState } from "react";
+
+// ── DATOS DE DEMO ──────────────────────────────────────────────
+const CATALOGO = [
+  { id: "C001", nombre: "Ácido Clorhídrico 37%", cas: "7647-01-0", unidad: "L", stock: 45, precio_costo: 12.5 },
+  { id: "C002", nombre: "Hidróxido de Sodio Pellets", cas: "1310-73-2", unidad: "kg", stock: 120, precio_costo: 8.2 },
+  { id: "C003", nombre: "Acetonitrilo HPLC Grade", cas: "75-05-8", unidad: "L", stock: 0, precio_costo: 38.0 },
+  { id: "C004", nombre: "Acetonitrilo LC-MS Grade", cas: "75-05-8", unidad: "L", stock: 18, precio_costo: 52.0 },
+  { id: "C005", nombre: "Metanol HPLC Grade", cas: "67-56-1", unidad: "L", stock: 32, precio_costo: 18.5 },
+  { id: "C006", nombre: "Cloruro de Potasio", cas: "7447-40-7", unidad: "kg", stock: 0, precio_costo: 14.0 },
+  { id: "C007", nombre: "Cloruro de Potasio PA", cas: "7447-40-7", unidad: "kg", stock: 8, precio_costo: 19.5 },
+  { id: "C008", nombre: "Glucosa Anhidra PA", cas: "50-99-7", unidad: "kg", stock: 25, precio_costo: 22.0 },
+  { id: "C009", nombre: "Fosfato Monopotásico", cas: "7778-77-0", unidad: "kg", stock: 0, precio_costo: 31.0 },
+  { id: "C010", nombre: "Fosfato Monopotásico Trazas", cas: "7778-77-0", unidad: "kg", stock: 5, precio_costo: 44.0 },
+];
+
+const PEDIDOS_DEMO = [
+  {
+    id: "PED-2026-041",
+    cliente: "Laboratorio San Roque S.A.",
+    fecha: "2026-06-24 09:14",
+    correo: "compras@sanroque.com.py",
+    estado: "pendiente",
+    items: [
+      { descripcion_cliente: "Acetonitrilo para HPLC, grado analítico", cantidad: 10, unidad: "L", cas_sugerido: "75-05-8" },
+      { descripcion_cliente: "NaOH en pellets para titulación", cantidad: 5, unidad: "kg", cas_sugerido: "1310-73-2" },
+      { descripcion_cliente: "HCl concentrado 37%", cantidad: 3, unidad: "L", cas_sugerido: "7647-01-0" },
+    ]
+  },
+  {
+    id: "PED-2026-040",
+    cliente: "Frigorífico Concepción S.A.",
+    fecha: "2026-06-23 16:42",
+    correo: "lab@frigorifico-concepcion.com.py",
+    estado: "pendiente",
+    items: [
+      { descripcion_cliente: "Cloruro de potasio grado alimentario", cantidad: 20, unidad: "kg", cas_sugerido: "7447-40-7" },
+      { descripcion_cliente: "Glucosa anhidra para control de calidad", cantidad: 10, unidad: "kg", cas_sugerido: "50-99-7" },
+    ]
+  },
+  {
+    id: "PED-2026-039",
+    cliente: "IPS - Laboratorio Central",
+    fecha: "2026-06-22 11:05",
+    correo: "adquisiciones@ips.gov.py",
+    estado: "aprobado",
+    items: [
+      { descripcion_cliente: "Metanol grado HPLC", cantidad: 20, unidad: "L", cas_sugerido: "67-56-1" },
+    ]
+  },
+];
+
+const MARGEN_MIN = 25;
+const MARGEN_ALERTA = 35;
+
+function calcularMargen(precioVenta, precioCosto) {
+  if (!precioVenta || precioVenta <= 0) return null;
+  return ((precioVenta - precioCosto) / precioVenta) * 100;
+}
+
+function getEquivalentes(cas) {
+  return CATALOGO.filter(p => p.cas === cas);
+}
+
+function MargenBadge({ margen }) {
+  if (margen === null) return <span style={{ fontSize: 11, color: "#888" }}>Sin precio</span>;
+  const color = margen >= MARGEN_ALERTA ? "#1A7A4A" : margen >= MARGEN_MIN ? "#D4A017" : "#C0392B";
+  const bg = margen >= MARGEN_ALERTA ? "#E6F4ED" : margen >= MARGEN_MIN ? "#FFFBF0" : "#FDECEA";
+  const label = margen >= MARGEN_ALERTA ? "✓ OK" : margen >= MARGEN_MIN ? "⚠ Alerta" : "✗ Bloqueado";
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, color, background: bg, padding: "3px 10px", borderRadius: 20 }}>
+      {label} · {margen.toFixed(1)}%
+    </span>
+  );
+}
+
+function ItemRow({ item, idx, precios, onPrecio, onProducto }) {
+  const equivalentes = getEquivalentes(item.cas_sugerido);
+  const selId = precios[idx]?.producto_id;
+  const selProd = CATALOGO.find(p => p.id === selId);
+  const precioVenta = parseFloat(precios[idx]?.precio_venta) || 0;
+  const margen = selProd ? calcularMargen(precioVenta, selProd.precio_costo) : null;
+  const noStock = equivalentes.every(e => e.stock === 0);
+
+  return (
+    <div style={{
+      background: "#F8FAFF", borderRadius: 12, padding: "16px 18px",
+      border: "1px solid #E0E8F5", marginBottom: 10
+    }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{
+          background: "#1B4FBB", color: "#fff", borderRadius: 8,
+          width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 12, fontWeight: 700, flexShrink: 0
+        }}>{idx + 1}</div>
+
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 4 }}>
+            {item.descripcion_cliente}
+          </div>
+          <div style={{ fontSize: 11, color: "#888" }}>
+            Cantidad: <strong>{item.cantidad} {item.unidad}</strong>
+            &nbsp;·&nbsp; CAS: <code style={{ background: "#E8EEF9", padding: "1px 6px", borderRadius: 4, color: "#1B4FBB" }}>{item.cas_sugerido}</code>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {/* Selector de producto */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#4A5A7A", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>
+            Producto equivalente
+          </div>
+          {equivalentes.length === 0 ? (
+            <div style={{ fontSize: 12, color: "#C0392B", background: "#FDECEA", padding: "8px 12px", borderRadius: 8 }}>
+              ⚠ Sin equivalente — requiere cotización al proveedor
+            </div>
+          ) : (
+            <select
+              value={selId || ""}
+              onChange={e => onProducto(idx, e.target.value)}
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: 8,
+                border: `2px solid ${selId ? "#1B4FBB" : "#E0E8F5"}`,
+                fontSize: 13, background: "#fff", color: "#1A1A1A", outline: "none"
+              }}
+            >
+              <option value="">Seleccionar producto...</option>
+              {equivalentes.map(eq => (
+                <option key={eq.id} value={eq.id}>
+                  {eq.nombre} {eq.stock === 0 ? "⚠ Sin stock" : `· Stock: ${eq.stock} ${eq.unidad}`}
+                </option>
+              ))}
+            </select>
+          )}
+          {selProd && (
+            <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>
+              Costo: <strong>USD {selProd.precio_costo.toFixed(2)}/{selProd.unidad}</strong>
+              {selProd.stock === 0 && <span style={{ color: "#C0392B", marginLeft: 6 }}>· Sobre pedido</span>}
+            </div>
+          )}
+        </div>
+
+        {/* Precio de venta */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#4A5A7A", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>
+            Precio de venta (USD/{item.unidad})
+          </div>
+          <input
+            type="number"
+            placeholder="0.00"
+            value={precios[idx]?.precio_venta || ""}
+            onChange={e => onPrecio(idx, e.target.value)}
+            disabled={!selId}
+            style={{
+              width: "100%", padding: "10px 12px", borderRadius: 8,
+              border: `2px solid ${precioVenta > 0 ? "#1B4FBB" : "#E0E8F5"}`,
+              fontSize: 14, fontWeight: 700, outline: "none",
+              background: !selId ? "#F5F5F5" : "#fff",
+              color: "#1A1A1A"
+            }}
+          />
+          {margen !== null && (
+            <div style={{ marginTop: 6 }}>
+              <MargenBadge margen={margen} />
+              {margen < MARGEN_MIN && (
+                <div style={{ fontSize: 11, color: "#C0392B", marginTop: 4 }}>
+                  Requiere aprobación del Directorio
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {noStock && equivalentes.length > 0 && (
+        <div style={{ marginTop: 10, fontSize: 12, color: "#D4A017", background: "#FFFBF0", padding: "8px 12px", borderRadius: 8 }}>
+          ⚠ Producto requiere importación sobre pedido — confirmar plazo con el cliente
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Portal() {
+  const [vista, setVista] = useState("bandeja");
+  const [pedidoActivo, setPedidoActivo] = useState(null);
+  const [precios, setPrecios] = useState({});
+  const [pedidos, setPedidos] = useState(PEDIDOS_DEMO);
+  const [enviado, setEnviado] = useState(false);
+  const [aprobacionVista, setAprobacionVista] = useState(null);
+
+  const pedidosPendientes = pedidos.filter(p => p.estado === "pendiente");
+  const pedidosAprobados = pedidos.filter(p => p.estado === "aprobado");
+  const pedidosAlerta = pedidos.filter(p => p.estado === "alerta");
+
+  const abrirPedido = (ped) => {
+    setPedidoActivo(ped);
+    setPrecios({});
+    setEnviado(false);
+    setVista("pedido");
+  };
+
+  const setPrecio = (idx, val) => setPrecios(p => ({ ...p, [idx]: { ...p[idx], precio_venta: val } }));
+  const setProducto = (idx, prodId) => setPrecios(p => ({ ...p, [idx]: { ...p[idx], producto_id: prodId } }));
+
+  const calcularEstadoCotizacion = () => {
+    if (!pedidoActivo) return "incompleto";
+    for (let i = 0; i < pedidoActivo.items.length; i++) {
+      const eq = getEquivalentes(pedidoActivo.items[i].cas_sugerido);
+      if (eq.length === 0) continue;
+      const selProd = CATALOGO.find(p => p.id === precios[i]?.producto_id);
+      if (!selProd) return "incompleto";
+      const pv = parseFloat(precios[i]?.precio_venta) || 0;
+      if (!pv) return "incompleto";
+      const m = calcularMargen(pv, selProd.precio_costo);
+      if (m !== null && m < MARGEN_MIN) return "alerta";
+    }
+    return "listo";
+  };
+
+  const estadoCot = calcularEstadoCotizacion();
+
+  const enviarCotizacion = () => {
+    const nuevoEstado = estadoCot === "alerta" ? "alerta" : "aprobado";
+    setPedidos(prev => prev.map(p => p.id === pedidoActivo.id ? { ...p, estado: nuevoEstado } : p));
+    setEnviado(true);
+    setTimeout(() => { setVista("bandeja"); setEnviado(false); }, 2000);
+  };
+
+  const aprobarPedido = (id) => {
+    setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: "aprobado" } : p));
+    setAprobacionVista(null);
+  };
+
+  const rechazarPedido = (id) => {
+    setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: "rechazado" } : p));
+    setAprobacionVista(null);
+  };
+
+  // ── VISTA BANDEJA ──
+  if (vista === "bandeja") return (
+    <div style={{ minHeight: "100vh", background: "#F0F4FA", fontFamily: "'Segoe UI', Arial, sans-serif" }}>
+
+      {/* Header */}
+      <div style={{ background: "#0B1020", padding: "0 24px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0" }}>
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#4ECDC4", textTransform: "uppercase" }}>Portal de Pedidos</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginTop: 2 }}>Medical Química SA</div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setVista("directorio")} style={{
+              padding: "8px 16px", borderRadius: 8, border: "1px solid #2A3A5A",
+              background: "transparent", color: "#4ECDC4", fontSize: 12, fontWeight: 600, cursor: "pointer"
+            }}>👔 Vista Directorio</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
+
+        {/* Stats */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+          {[
+            { label: "Pendientes", valor: pedidosPendientes.length, color: "#1B4FBB", bg: "#E8EEF9" },
+            { label: "Requieren aprobación", valor: pedidosAlerta.length, color: "#D4A017", bg: "#FFFBF0" },
+            { label: "Aprobados hoy", valor: pedidosAprobados.length, color: "#1A7A4A", bg: "#E6F4ED" },
+          ].map(s => (
+            <div key={s.label} style={{ background: "#fff", borderRadius: 12, padding: "16px 20px", border: "1px solid #E0E8F5" }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color: s.color }}>{s.valor}</div>
+              <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Lista pedidos pendientes */}
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "#888", textTransform: "uppercase", marginBottom: 12 }}>
+          Pedidos pendientes de cotización
+        </div>
+
+        {pedidosPendientes.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: 12, padding: 32, textAlign: "center", color: "#888", border: "1px solid #E0E8F5" }}>
+            ✓ Sin pedidos pendientes
+          </div>
+        ) : pedidosPendientes.map(ped => (
+          <div key={ped.id} onClick={() => abrirPedido(ped)} style={{
+            background: "#fff", borderRadius: 12, padding: "18px 20px", marginBottom: 10,
+            border: "1px solid #E0E8F5", cursor: "pointer", transition: "all 0.2s",
+            borderLeft: "4px solid #1B4FBB"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{ped.cliente}</div>
+                <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>{ped.correo} · {ped.fecha}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 11, color: "#888" }}>{ped.items.length} productos</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#1B4FBB", background: "#E8EEF9", padding: "4px 12px", borderRadius: 20 }}>
+                  {ped.id}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+              {ped.items.map((item, i) => (
+                <span key={i} style={{ fontSize: 11, color: "#555", background: "#F5F7FC", padding: "3px 10px", borderRadius: 20 }}>
+                  {item.cantidad} {item.unidad} · {item.cas_sugerido}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Pedidos en alerta */}
+        {pedidosAlerta.length > 0 && (
+          <>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: "#D4A017", textTransform: "uppercase", marginBottom: 12, marginTop: 24 }}>
+              ⚠ Esperando aprobación del Directorio
+            </div>
+            {pedidosAlerta.map(ped => (
+              <div key={ped.id} style={{
+                background: "#FFFBF0", borderRadius: 12, padding: "18px 20px", marginBottom: 10,
+                border: "1px solid #F0D080", borderLeft: "4px solid #D4A017"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{ped.cliente}</div>
+                    <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>Margen por debajo del mínimo — requiere aprobación</div>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#D4A017" }}>{ped.id}</span>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Aprobados */}
+        {pedidosAprobados.length > 0 && (
+          <>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: "#1A7A4A", textTransform: "uppercase", marginBottom: 12, marginTop: 24 }}>
+              ✓ Aprobados
+            </div>
+            {pedidosAprobados.map(ped => (
+              <div key={ped.id} style={{
+                background: "#E6F4ED", borderRadius: 12, padding: "14px 20px", marginBottom: 8,
+                border: "1px solid #B8DFC8", borderLeft: "4px solid #1A7A4A", opacity: 0.8
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1A7A4A" }}>{ped.cliente}</div>
+                  <span style={{ fontSize: 11, color: "#1A7A4A" }}>{ped.id} · Listo para Excel</span>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── VISTA PEDIDO ──
+  if (vista === "pedido" && pedidoActivo) return (
+    <div style={{ minHeight: "100vh", background: "#F0F4FA", fontFamily: "'Segoe UI', Arial, sans-serif" }}>
+
+      <div style={{ background: "#0B1020", padding: "0 24px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "14px 0", display: "flex", alignItems: "center", gap: 16 }}>
+          <button onClick={() => setVista("bandeja")} style={{
+            background: "none", border: "1px solid #2A3A5A", color: "#888", borderRadius: 8,
+            padding: "6px 14px", fontSize: 12, cursor: "pointer"
+          }}>← Volver</button>
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#4ECDC4", textTransform: "uppercase" }}>{pedidoActivo.id}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{pedidoActivo.cliente}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
+
+        <div style={{ background: "#fff", borderRadius: 12, padding: "16px 20px", marginBottom: 16, border: "1px solid #E0E8F5" }}>
+          <div style={{ fontSize: 11, color: "#888" }}>Recibido de: <strong>{pedidoActivo.correo}</strong> · {pedidoActivo.fecha}</div>
+        </div>
+
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "#888", textTransform: "uppercase", marginBottom: 12 }}>
+          Productos del pedido · Seleccioná el equivalente y cargá el precio
+        </div>
+
+        {pedidoActivo.items.map((item, idx) => (
+          <ItemRow key={idx} item={item} idx={idx} precios={precios} onPrecio={setPrecio} onProducto={setProducto} />
+        ))}
+
+        {/* Botón enviar */}
+        <div style={{ marginTop: 20, display: "flex", gap: 12, alignItems: "center" }}>
+          <button
+            onClick={enviarCotizacion}
+            disabled={estadoCot === "incompleto" || enviado}
+            style={{
+              flex: 1, padding: 16, borderRadius: 12, border: "none", cursor: estadoCot === "incompleto" ? "not-allowed" : "pointer",
+              background: enviado ? "#1A7A4A" : estadoCot === "alerta" ? "#D4A017" : estadoCot === "listo" ? "#1B4FBB" : "#CCC",
+              color: "#fff", fontWeight: 700, fontSize: 15, transition: "all 0.3s"
+            }}
+          >
+            {enviado ? "✓ Enviado" : estadoCot === "alerta" ? "⚠ Enviar a aprobación del Directorio" : estadoCot === "listo" ? "✓ Aprobar y generar cotización" : "Completá todos los precios para continuar"}
+          </button>
+        </div>
+
+        {estadoCot === "alerta" && (
+          <div style={{ marginTop: 10, fontSize: 12, color: "#D4A017", background: "#FFFBF0", padding: "12px 16px", borderRadius: 10, border: "1px solid #F0D080" }}>
+            ⚠ Uno o más productos tienen margen por debajo del {MARGEN_MIN}%. La cotización irá al Directorio para aprobación antes de enviarse al cliente.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── VISTA DIRECTORIO ──
+  if (vista === "directorio") return (
+    <div style={{ minHeight: "100vh", background: "#0B1020", fontFamily: "'Segoe UI', Arial, sans-serif" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
+
+        <div style={{ marginBottom: 24 }}>
+          <button onClick={() => setVista("bandeja")} style={{
+            background: "none", border: "1px solid #2A3A5A", color: "#888", borderRadius: 8,
+            padding: "6px 14px", fontSize: 12, cursor: "pointer", marginBottom: 16
+          }}>← Portal vendedores</button>
+          <div style={{ fontSize: 10, letterSpacing: 3, color: "#4ECDC4", textTransform: "uppercase" }}>Vista Directorio</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: "#fff", marginTop: 4 }}>Panel de Aprobaciones</div>
+        </div>
+
+        {pedidosAlerta.length === 0 ? (
+          <div style={{ background: "#111827", borderRadius: 16, padding: 40, textAlign: "center", border: "1px solid #1E2A3E" }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+            <div style={{ fontSize: 16, color: "#4ECDC4", fontWeight: 700 }}>Sin pedidos pendientes de aprobación</div>
+            <div style={{ fontSize: 13, color: "#4A5A7A", marginTop: 8 }}>Todos los márgenes están dentro del rango autorizado</div>
+          </div>
+        ) : pedidosAlerta.map(ped => (
+          <div key={ped.id} style={{ background: "#111827", borderRadius: 16, padding: 24, marginBottom: 16, border: "1px solid #D4A017" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, letterSpacing: 2, color: "#D4A017", textTransform: "uppercase", marginBottom: 4 }}>
+                  ⚠ Requiere aprobación · {ped.id}
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{ped.cliente}</div>
+                <div style={{ fontSize: 12, color: "#4A5A7A", marginTop: 2 }}>{ped.correo}</div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 12, color: "#4A5A7A", marginBottom: 16, fontStyle: "italic" }}>
+              Uno o más productos tienen margen inferior al {MARGEN_MIN}% autorizado
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => aprobarPedido(ped.id)} style={{
+                flex: 1, padding: "14px", borderRadius: 10, border: "none",
+                background: "#1A7A4A", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer"
+              }}>✓ Aprobar cotización</button>
+              <button onClick={() => rechazarPedido(ped.id)} style={{
+                flex: 1, padding: "14px", borderRadius: 10, border: "1px solid #C0392B",
+                background: "transparent", color: "#C0392B", fontWeight: 700, fontSize: 14, cursor: "pointer"
+              }}>✗ Rechazar</button>
+            </div>
+          </div>
+        ))}
+
+        {/* Resumen de aprobados */}
+        {pedidosAprobados.length > 0 && (
+          <>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: "#1A7A4A", textTransform: "uppercase", marginBottom: 12, marginTop: 24 }}>
+              ✓ Aprobados
+            </div>
+            {pedidosAprobados.map(ped => (
+              <div key={ped.id} style={{
+                background: "#0D1F17", borderRadius: 12, padding: "14px 20px", marginBottom: 8,
+                border: "1px solid #1A7A4A"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 13, color: "#4ECDC4", fontWeight: 600 }}>{ped.cliente}</span>
+                  <span style={{ fontSize: 11, color: "#1A7A4A" }}>{ped.id} · Listo para exportar a Excel</span>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  return null;
+}
